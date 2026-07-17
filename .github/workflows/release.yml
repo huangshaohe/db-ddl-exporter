@@ -30,9 +30,9 @@ jobs:
         shell: bash
         run: |
           mkdir release
-          cp target/kingbase-ddl-exporter.jar start.bat start.sh release/
+          cp target/db-ddl-exporter.jar start.bat start.sh release/
           cd release
-          sha256sum kingbase-ddl-exporter.jar start.bat start.sh > SHA256SUMS
+          sha256sum db-ddl-exporter.jar start.bat start.sh > SHA256SUMS
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

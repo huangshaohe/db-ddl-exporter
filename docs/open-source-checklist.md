@@ -7,7 +7,7 @@
 - [ ] 确认源码权利人和对外发布授权。
 - [ ] 由权利人选择许可证并添加根目录 `LICENSE`；未添加许可证前，公开可见不等于开源授权。
 - [ ] 确认项目名称、`com.thunisoft.tools` Maven 坐标和 Java 包名是否允许公开使用。
-- [ ] 新建干净的独立仓库，只复制 `tools/kingbase-ddl-exporter`；不要直接公开当前业务单体仓库及其 Git 历史。
+- [x] 新建干净的独立仓库，仅发布 DB DDL Exporter 源码；未公开原业务仓库及其 Git 历史。
 - [ ] 确认不包含真实密码、JDBC URL、内网 IP、业务模式/对象清单、服务名、源码路径或日志。
 - [ ] 不复制项目外的 `ci/db-schema-usage.csv`、`DB_SCHEMA_USAGE.md` 或任何内部扫描产物。
 - [ ] 不提交 Kingbase 或其他厂商的 JDBC 驱动，除非其许可证明确允许再分发。

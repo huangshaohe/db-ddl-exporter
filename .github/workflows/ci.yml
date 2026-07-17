@@ -29,8 +29,8 @@ jobs:
         run: mvn -B -ntp clean verify
       - name: Smoke-test executable JAR
         run: |
-          java -jar target/kingbase-ddl-exporter.jar --version
-          java -jar target/kingbase-ddl-exporter.jar export --help
+          java -jar target/db-ddl-exporter.jar --version
+          java -jar target/db-ddl-exporter.jar export --help
           mkdir launcher-smoke
-          cp target/kingbase-ddl-exporter.jar start.sh launcher-smoke/
+          cp target/db-ddl-exporter.jar start.sh launcher-smoke/
           launcher-smoke/start.sh --version
