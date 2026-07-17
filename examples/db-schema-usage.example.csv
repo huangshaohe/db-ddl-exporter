@@ -1,0 +1,5 @@
+schema,object,evidence,services,source_files
+public,customers,entity,customer-service,src/main/java/example/Customer.java
+public,orders,entity+mapper-sql,order-service,src/main/java/example/Order.java;src/main/java/example/OrderMapper.java
+public,order_items,mapper-sql,order-service,src/main/java/example/OrderMapper.java
+reporting,daily_sales,mapper-sql,report-service,src/main/java/example/ReportMapper.java

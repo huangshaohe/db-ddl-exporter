@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Verify tag matches project version
+        shell: bash
+        run: |
+          project_version=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
+          test "v${project_version}" = "${GITHUB_REF_NAME}"
+      - name: Build and test
+        run: mvn -B -ntp clean verify
+      - name: Prepare checksums
+        shell: bash
+        run: |
+          mkdir release
+          cp target/kingbase-ddl-exporter.jar start.bat start.sh release/
+          cd release
+          sha256sum kingbase-ddl-exporter.jar start.bat start.sh > SHA256SUMS
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" release/* --verify-tag --generate-notes --title "${GITHUB_REF_NAME}"

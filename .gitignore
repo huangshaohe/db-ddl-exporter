@@ -1,0 +1,12 @@
+target/
+.DS_Store
+.idea/
+.vscode/
+*.iml
+.classpath
+.project
+.settings/
+*.log
+*.jar
+drivers/
+exports/

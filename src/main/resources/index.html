@@ -1,0 +1,1233 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>DB DDL Exporter</title>
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: Inter, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+            --bg: #f7f9fc;
+            --surface: #ffffff;
+            --surface-soft: #f8fafc;
+            --surface-blue: #f4f8ff;
+            --text: #182230;
+            --text-soft: #475467;
+            --muted: #667085;
+            --muted-light: #98a2b3;
+            --line: #e2e8f0;
+            --line-strong: #cbd5e1;
+            --blue: #246bfd;
+            --blue-dark: #1755d1;
+            --blue-soft: #eaf1ff;
+            --green: #16a467;
+            --green-dark: #0f7b4d;
+            --green-soft: #ecfdf3;
+            --red: #d92d20;
+            --red-soft: #fff1f0;
+            --amber: #b54708;
+            --amber-soft: #fff7ed;
+            --shadow: 0 1px 2px rgba(16, 24, 40, .03), 0 8px 24px rgba(16, 24, 40, .04);
+            --radius: 10px;
+        }
+
+        * { box-sizing: border-box; }
+        html { min-width: 320px; background: var(--bg); }
+        body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); }
+        button, input, select, textarea { font: inherit; }
+        button, a, input, select { -webkit-tap-highlight-color: transparent; }
+        button { color: inherit; }
+        img { display: block; }
+        [hidden] { display: none !important; }
+
+        :focus-visible {
+            outline: 3px solid rgba(36, 107, 253, .2);
+            outline-offset: 2px;
+        }
+
+        .top-accent { height: 2px; background: var(--blue); }
+        .app-header {
+            height: 66px;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(255, 255, 255, .98);
+        }
+        .brand, .header-actions, .header-link, .local-badge { display: flex; align-items: center; }
+        .brand { min-width: 0; gap: 12px; color: var(--text); text-decoration: none; }
+        .brand-mark {
+            width: 26px;
+            height: 26px;
+            filter: invert(38%) sepia(89%) saturate(3360%) hue-rotate(215deg) brightness(99%) contrast(100%);
+        }
+        .brand-name { font-size: 20px; font-weight: 760; letter-spacing: -.3px; white-space: nowrap; }
+        .local-badge {
+            gap: 7px;
+            margin-left: 6px;
+            min-height: 30px;
+            padding: 0 10px;
+            border: 1px solid #d7e6dd;
+            border-radius: 7px;
+            color: #267052;
+            background: #f8fcfa;
+            font-size: 12px;
+            font-weight: 650;
+            white-space: nowrap;
+        }
+        .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #2fb879; box-shadow: 0 0 0 3px #e9f8f0; }
+        .header-actions { gap: 6px; }
+        .header-link {
+            gap: 7px;
+            height: 36px;
+            padding: 0 10px;
+            border-radius: 7px;
+            color: var(--text-soft);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .header-link:hover { background: var(--surface-soft); color: var(--text); }
+        .header-link img { width: 16px; height: 16px; opacity: .83; }
+
+        .app-shell {
+            width: min(1488px, 100%);
+            min-height: calc(100vh - 68px);
+            margin: 0 auto;
+            padding: 24px 26px;
+            display: grid;
+            grid-template-columns: 208px minmax(0, 1fr) 304px;
+            gap: 18px;
+            align-items: start;
+        }
+
+        .step-nav { padding: 14px 4px 0 6px; }
+        .step-list { margin: 0; padding: 0; list-style: none; }
+        .step-item { position: relative; min-height: 96px; }
+        .step-item:not(:last-child)::after {
+            content: "";
+            position: absolute;
+            z-index: 0;
+            left: 14px;
+            top: 35px;
+            bottom: 0;
+            width: 1px;
+            border-left: 1px dashed #cfd7e4;
+        }
+        .step-button {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            display: grid;
+            grid-template-columns: 30px 1fr;
+            gap: 12px;
+            text-align: left;
+            cursor: pointer;
+        }
+        .step-button:disabled { cursor: default; }
+        .step-number {
+            width: 28px;
+            height: 28px;
+            display: grid;
+            place-items: center;
+            border: 1px solid var(--line-strong);
+            border-radius: 50%;
+            background: var(--bg);
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 700;
+            transition: .18s ease;
+        }
+        .step-copy { min-width: 0; padding-top: 1px; }
+        .step-title { display: block; color: var(--text-soft); font-size: 14px; font-weight: 700; line-height: 26px; }
+        .step-description { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+        .step-item.active .step-number, .step-item.complete .step-number {
+            color: #fff;
+            border-color: var(--blue);
+            background: var(--blue);
+        }
+        .step-item.active .step-title { color: var(--blue); }
+        .step-item.complete:not(.active) .step-title { color: var(--text); }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--surface);
+            box-shadow: var(--shadow);
+        }
+        .workspace { min-width: 0; overflow: hidden; }
+        .workspace-head { padding: 22px 26px 16px; border-bottom: 1px solid var(--line); }
+        .workspace-title { margin: 0; font-size: 22px; line-height: 1.35; letter-spacing: -.2px; }
+        .workspace-subtitle { margin: 7px 0 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+        .workspace-body { padding: 20px 26px 24px; }
+
+        .section + .section { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line); }
+        .section-title { margin: 0 0 14px; font-size: 15px; font-weight: 750; line-height: 1.4; }
+        .section-intro { margin: -6px 0 15px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+        .db-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+        .db-card {
+            position: relative;
+            min-width: 0;
+            min-height: 122px;
+            padding: 15px 8px 12px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--surface);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
+        }
+        .db-card:hover { border-color: #aabfe9; background: #fbfdff; }
+        .db-card[aria-pressed="true"] {
+            border-color: var(--blue);
+            background: var(--surface-blue);
+            box-shadow: 0 0 0 1px var(--blue);
+        }
+        .db-logo { width: 34px; height: 34px; object-fit: contain; }
+        .db-logo.generic { filter: invert(43%) sepia(16%) saturate(478%) hue-rotate(181deg) brightness(91%) contrast(88%); }
+        .db-card[data-db="kingbase"] .db-logo { filter: invert(23%) sepia(98%) saturate(3979%) hue-rotate(349deg) brightness(86%) contrast(99%); }
+        .db-name { overflow: hidden; max-width: 100%; color: var(--text-soft); font-size: 13px; font-weight: 680; text-overflow: ellipsis; white-space: nowrap; }
+        .db-card[aria-pressed="true"] .db-name { color: var(--blue-dark); }
+        .db-badge {
+            position: absolute;
+            top: 7px;
+            right: 7px;
+            padding: 2px 5px;
+            border-radius: 999px;
+            background: #edf2f7;
+            color: var(--muted);
+            font-size: 9px;
+            font-weight: 700;
+        }
+        .db-card[aria-pressed="true"] .db-badge { color: var(--blue-dark); background: var(--blue-soft); }
+        .selected-check { position: absolute; top: 8px; right: 8px; width: 18px; height: 18px; display: none; filter: invert(40%) sepia(95%) saturate(3124%) hue-rotate(214deg) brightness(101%) contrast(99%); }
+        .db-card[aria-pressed="true"] .selected-check { display: block; }
+        .db-card[aria-pressed="true"] .db-badge { display: none; }
+        .recommend-badge { padding: 2px 7px; border-radius: 999px; color: var(--blue-dark); background: var(--blue-soft); font-size: 10px; font-weight: 750; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px 18px; }
+        .col-12 { grid-column: span 12; }
+        .col-8 { grid-column: span 8; }
+        .col-7 { grid-column: span 7; }
+        .col-6 { grid-column: span 6; }
+        .col-5 { grid-column: span 5; }
+        .col-4 { grid-column: span 4; }
+        .col-3 { grid-column: span 3; }
+        .field { min-width: 0; }
+        .field-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 7px; color: var(--text-soft); font-size: 13px; font-weight: 650; }
+        .field-label em { color: var(--muted-light); font-style: normal; font-weight: 500; }
+        .input, .select {
+            width: 100%;
+            height: 42px;
+            padding: 0 11px;
+            border: 1px solid var(--line-strong);
+            border-radius: 7px;
+            outline: 0;
+            color: var(--text);
+            background: #fff;
+            font-size: 14px;
+            transition: border-color .15s ease, box-shadow .15s ease;
+        }
+        .input:hover, .select:hover { border-color: #aeb8c8; }
+        .input:focus, .select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(36, 107, 253, .12); }
+        .input::placeholder { color: #a4adba; }
+        .input[readonly] { color: var(--text-soft); background: var(--surface-soft); }
+        .field-help { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+        .password-wrap { position: relative; }
+        .password-wrap .input { padding-right: 40px; }
+        .icon-button {
+            width: 34px;
+            height: 34px;
+            padding: 0;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+        }
+        .icon-button:hover { background: #f1f5f9; }
+        .password-toggle { position: absolute; top: 3px; right: 3px; }
+        .icon-button img { width: 16px; height: 16px; opacity: .65; }
+
+        .file-control {
+            min-height: 40px;
+            padding: 4px 7px 4px 4px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 1px solid var(--line-strong);
+            border-radius: 7px;
+            background: #fff;
+        }
+        .file-control:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(36, 107, 253, .12); }
+        .visually-hidden {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            padding: 0 !important;
+            margin: -1px !important;
+            overflow: hidden !important;
+            clip: rect(0, 0, 0, 0) !important;
+            white-space: nowrap !important;
+            border: 0 !important;
+        }
+        .file-button {
+            height: 30px;
+            padding: 0 10px;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            background: var(--surface-soft);
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            color: var(--text-soft);
+            font-size: 12px;
+            font-weight: 650;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .file-button:hover { border-color: #b4c1d3; background: #f1f5f9; }
+        .file-button img { width: 14px; height: 14px; opacity: .68; }
+        .file-name { min-width: 0; overflow: hidden; color: var(--text-soft); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+        .file-ok { width: 16px; height: 16px; margin-left: auto; filter: invert(47%) sepia(51%) saturate(1178%) hue-rotate(103deg) brightness(89%) contrast(90%); }
+
+        .connection-banner {
+            margin-bottom: 20px;
+            padding: 12px 14px;
+            border: 1px solid #d8e5fa;
+            border-radius: 8px;
+            background: var(--surface-blue);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+        .connection-banner-copy { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .connection-banner-copy img { width: 22px; height: 22px; object-fit: contain; }
+        .connection-banner-copy strong { display: block; font-size: 13px; }
+        .connection-banner-copy span { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+        .link-button { padding: 0; border: 0; background: transparent; color: var(--blue); font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+        .link-button:hover { text-decoration: underline; }
+
+        .connection-test {
+            margin-top: 20px;
+            padding-top: 18px;
+            border-top: 1px solid var(--line);
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            gap: 16px;
+            align-items: stretch;
+        }
+        .test-copy h3 { margin: 0 0 5px; font-size: 14px; }
+        .test-copy p { margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+        .button {
+            min-height: 40px;
+            padding: 0 16px;
+            border: 1px solid transparent;
+            border-radius: 7px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 720;
+            cursor: pointer;
+            transition: background .15s ease, border-color .15s ease, transform .15s ease;
+        }
+        .button:active { transform: translateY(1px); }
+        .button:disabled { cursor: wait; opacity: .58; transform: none; }
+        .button-primary { color: #fff; background: var(--blue); }
+        .button-primary:hover:not(:disabled) { background: var(--blue-dark); }
+        .button-secondary { border-color: var(--line-strong); color: var(--text-soft); background: #fff; }
+        .button-secondary:hover:not(:disabled) { background: var(--surface-soft); }
+        .button img { width: 15px; height: 15px; }
+        .button-primary img { filter: brightness(0) invert(1); }
+        .test-result {
+            min-height: 90px;
+            padding: 13px 15px;
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            display: flex;
+            align-items: center;
+            color: var(--muted);
+            background: var(--surface-soft);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .test-result.success { border-color: #b9e6cf; color: var(--green-dark); background: var(--green-soft); }
+        .test-result.error { border-color: #f4c7c3; color: #b42318; background: var(--red-soft); }
+        .test-result.loading { border-color: #cbdafa; color: var(--blue-dark); background: var(--surface-blue); }
+        .result-line { display: flex; align-items: center; gap: 8px; font-weight: 720; }
+        .result-line img { width: 18px; height: 18px; filter: invert(43%) sepia(53%) saturate(993%) hue-rotate(104deg) brightness(91%) contrast(90%); }
+        .result-meta { margin-top: 4px; color: var(--text-soft); }
+
+        .mode-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+        .mode-card {
+            min-width: 0;
+            min-height: 92px;
+            padding: 14px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #fff;
+            text-align: left;
+            cursor: pointer;
+        }
+        .mode-card:hover { border-color: #abc1eb; }
+        .mode-card[aria-pressed="true"] { border-color: var(--blue); background: var(--surface-blue); box-shadow: 0 0 0 1px var(--blue); }
+        .mode-card strong { display: block; margin-bottom: 5px; color: var(--text); font-size: 13px; }
+        .mode-card span { display: block; color: var(--muted); font-size: 11px; line-height: 1.5; }
+        .scope-fields { margin-top: 20px; }
+        .csv-summary-card { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-soft); }
+        .csv-summary-card p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.65; }
+
+        .progress-panel { margin-top: 18px; padding: 14px; border: 1px solid #d8e5fa; border-radius: 8px; background: var(--surface-blue); }
+        .progress-head { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 9px; font-size: 12px; }
+        .progress-message { overflow: hidden; color: var(--text-soft); text-overflow: ellipsis; white-space: nowrap; }
+        .progress-count { color: var(--blue-dark); font-weight: 720; white-space: nowrap; }
+        .progress-track { height: 8px; overflow: hidden; border-radius: 999px; background: #dfe8f7; }
+        .progress-fill { width: 0; height: 100%; border-radius: inherit; background: var(--blue); transition: width .22s ease; }
+        .progress-track.indeterminate .progress-fill { width: 30%; animation: progress-slide 1.1s ease-in-out infinite; }
+        @keyframes progress-slide { from { transform: translateX(-120%); } to { transform: translateX(360%); } }
+        .export-status { margin-top: 12px; padding: 11px 13px; border-radius: 7px; font-size: 12px; line-height: 1.55; }
+        .export-status.info { color: var(--blue-dark); background: var(--surface-blue); }
+        .export-status.error { color: #b42318; background: var(--red-soft); }
+        .export-status.success { color: var(--green-dark); background: var(--green-soft); }
+
+        .summary { position: sticky; top: 18px; min-height: calc(100vh - 112px); overflow: hidden; display: flex; flex-direction: column; }
+        .summary-body { flex: 1; padding: 22px 22px 18px; }
+        .summary-title { margin: 0 0 20px; font-size: 17px; }
+        .summary-group + .summary-group { margin-top: 22px; }
+        .summary-label { margin: 0 0 10px; color: var(--text); font-size: 13px; font-weight: 750; }
+        .summary-database { display: flex; align-items: center; gap: 11px; min-width: 0; }
+        .summary-database img { width: 30px; height: 30px; object-fit: contain; }
+        .summary-database img.generic { filter: invert(23%) sepia(98%) saturate(3979%) hue-rotate(349deg) brightness(86%) contrast(99%); }
+        .summary-database strong { display: block; font-size: 14px; }
+        .summary-database span { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; }
+        .summary-list { margin: 0; display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 8px 8px; font-size: 12px; line-height: 1.45; }
+        .summary-list dt { color: var(--muted); }
+        .summary-list dd { margin: 0; overflow: hidden; color: var(--text-soft); text-overflow: ellipsis; white-space: nowrap; }
+        .security-note { margin-top: 24px; padding: 13px; border: 1px solid #c9e8d8; border-radius: 7px; background: var(--green-soft); }
+        .security-title { display: flex; align-items: center; gap: 8px; color: var(--green-dark); font-size: 12px; font-weight: 760; }
+        .security-title img { width: 15px; height: 15px; filter: invert(42%) sepia(60%) saturate(782%) hue-rotate(105deg) brightness(85%) contrast(89%); }
+        .security-note p { margin: 7px 0 0; color: #39745b; font-size: 11px; line-height: 1.6; }
+        .summary-actions { padding: 16px 20px 20px; border-top: 1px solid var(--line); display: grid; gap: 9px; }
+        .summary-actions .button { width: 100%; min-height: 44px; }
+
+        .compatibility-note { margin-top: 16px; display: flex; gap: 9px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+        .compatibility-note img { flex: 0 0 auto; width: 15px; height: 15px; margin-top: 1px; opacity: .62; }
+
+        @media (max-width: 1180px) {
+            .app-shell { grid-template-columns: 176px minmax(0, 1fr); }
+            .summary { position: static; min-height: 0; grid-column: 2; }
+            .summary-body { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; }
+            .summary-title, .security-note { grid-column: 1 / -1; }
+            .summary-group + .summary-group { margin-top: 0; }
+            .summary-actions { grid-template-columns: 1fr 1fr; }
+            .db-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+
+        @media (max-width: 820px) {
+            .app-header { height: 60px; padding: 0 16px; }
+            .local-badge { display: none; }
+            .header-link span { display: none; }
+            .header-link { width: 36px; padding: 0; justify-content: center; }
+            .app-shell { padding: 16px; display: block; min-height: calc(100vh - 62px); }
+            .step-nav { padding: 0 0 14px; overflow-x: auto; }
+            .step-list { min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .step-item { min-height: auto; }
+            .step-item:not(:last-child)::after { left: 29px; right: -6px; top: 14px; bottom: auto; width: auto; border-left: 0; border-top: 1px dashed #cfd7e4; }
+            .step-description { display: none; }
+            .step-title { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+            .workspace { margin-bottom: 14px; }
+            .summary { margin-bottom: 14px; }
+            .summary-body { display: block; }
+            .summary-title { margin-bottom: 16px; }
+            .summary-group + .summary-group { margin-top: 18px; }
+            .summary-actions { grid-template-columns: 1fr 1fr; }
+        }
+
+        @media (max-width: 640px) {
+            .brand-name { font-size: 17px; }
+            .app-shell { padding: 10px; }
+            .workspace-head { padding: 19px 18px 15px; }
+            .workspace-title { font-size: 19px; }
+            .workspace-body { padding: 18px; }
+            .db-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .db-card { min-height: 100px; }
+            .form-grid { grid-template-columns: 1fr; gap: 14px; }
+            .col-12, .col-8, .col-7, .col-6, .col-5, .col-4, .col-3 { grid-column: auto; }
+            .connection-test { grid-template-columns: 1fr; }
+            .mode-grid { grid-template-columns: 1fr; }
+            .summary-body { padding: 19px 18px; }
+            .summary-actions { padding: 14px 18px 18px; grid-template-columns: 1fr; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+        }
+    </style>
+</head>
+<body>
+<div class="top-accent"></div>
+<header class="app-header">
+    <div class="brand">
+        <img class="brand-mark" src="/assets/icons/database-fill.svg" alt="">
+        <span class="brand-name">DB DDL Exporter</span>
+        <span class="local-badge"><span class="status-dot"></span>本地处理 · 离线运行</span>
+    </div>
+    <nav class="header-actions" aria-label="项目导航">
+        <a class="header-link" href="https://github.com/huangshaohe?tab=repositories" target="_blank" rel="noreferrer">
+            <img src="/assets/icons/github.svg" alt=""><span>开源项目</span>
+        </a>
+        <a class="header-link" href="https://github.com/huangshaohe?tab=repositories" target="_blank" rel="noreferrer">
+            <img src="/assets/icons/file-earmark-text.svg" alt=""><span>文档</span>
+        </a>
+        <a class="header-link" href="#security-note">
+            <img src="/assets/icons/info-circle.svg" alt=""><span>关于</span>
+        </a>
+    </nav>
+</header>
+
+<main class="app-shell">
+    <nav class="step-nav" aria-label="导出步骤">
+        <ol class="step-list">
+            <li class="step-item active" data-step-item="1">
+                <button class="step-button" type="button" data-go-step="1" aria-current="step">
+                    <span class="step-number">1</span>
+                    <span class="step-copy">
+                        <span class="step-title">数据库与驱动</span>
+                        <span class="step-description">选择数据库类型与 JDBC 驱动</span>
+                    </span>
+                </button>
+            </li>
+            <li class="step-item" data-step-item="2">
+                <button class="step-button" type="button" data-go-step="2" disabled>
+                    <span class="step-number">2</span>
+                    <span class="step-copy">
+                        <span class="step-title">连接配置</span>
+                        <span class="step-description">验证 JDBC 连接信息</span>
+                    </span>
+                </button>
+            </li>
+            <li class="step-item" data-step-item="3">
+                <button class="step-button" type="button" data-go-step="3" disabled>
+                    <span class="step-number">3</span>
+                    <span class="step-copy">
+                        <span class="step-title">导出范围</span>
+                        <span class="step-description">选择模式、对象与输出范围</span>
+                    </span>
+                </button>
+            </li>
+        </ol>
+    </nav>
+
+    <form id="exportForm" class="panel workspace" novalidate>
+        <input name="csrfToken" type="hidden" value="${CSRF_TOKEN}">
+        <input id="databaseType" name="databaseType" type="hidden" value="kingbase">
+        <input id="exportMode" name="exportMode" type="hidden" value="csv">
+        <input id="jdbcUrl" name="jdbcUrl" type="hidden">
+
+        <header class="workspace-head">
+            <h1 id="workspaceTitle" class="workspace-title">选择数据库与驱动</h1>
+            <p id="workspaceSubtitle" class="workspace-subtitle">选择目标数据库类型，配置 JDBC 驱动与连接信息。</p>
+        </header>
+
+        <div class="workspace-body">
+            <section id="databaseSection" class="section" aria-labelledby="databaseTitle">
+                <h2 id="databaseTitle" class="section-title">数据库类型</h2>
+                <div class="db-grid" role="group" aria-label="选择数据库类型">
+                    <button class="db-card" type="button" data-db="kingbase" aria-pressed="true">
+                        <img class="selected-check" src="/assets/icons/check-circle-fill.svg" alt="已选择">
+                        <img class="db-logo generic" src="/assets/icons/database-fill.svg" alt="">
+                        <span class="db-name">KingbaseES</span>
+                        <span class="recommend-badge">推荐</span>
+                    </button>
+                    <button class="db-card" type="button" data-db="postgresql" aria-pressed="false">
+                        <span class="db-badge">JDBC</span>
+                        <img class="selected-check" src="/assets/icons/check-circle-fill.svg" alt="已选择">
+                        <img class="db-logo" src="/assets/icons/postgresql.svg" alt="">
+                        <span class="db-name">PostgreSQL</span>
+                    </button>
+                    <button class="db-card" type="button" data-db="mysql" aria-pressed="false">
+                        <span class="db-badge">JDBC</span>
+                        <img class="selected-check" src="/assets/icons/check-circle-fill.svg" alt="已选择">
+                        <img class="db-logo" src="/assets/icons/mysql.svg" alt="">
+                        <span class="db-name">MySQL / MariaDB</span>
+                    </button>
+                    <button class="db-card" type="button" data-db="oracle" aria-pressed="false">
+                        <span class="db-badge">实验</span>
+                        <img class="selected-check" src="/assets/icons/check-circle-fill.svg" alt="已选择">
+                        <img class="db-logo" src="/assets/icons/oracle.svg" alt="">
+                        <span class="db-name">Oracle</span>
+                    </button>
+                    <button class="db-card" type="button" data-db="sqlserver" aria-pressed="false">
+                        <span class="db-badge">JDBC</span>
+                        <img class="selected-check" src="/assets/icons/check-circle-fill.svg" alt="已选择">
+                        <img class="db-logo" src="/assets/icons/sqlserver.svg" alt="">
+                        <span class="db-name">SQL Server</span>
+                    </button>
+                    <button class="db-card" type="button" data-db="generic" aria-pressed="false">
+                        <span class="db-badge">通用</span>
+                        <img class="selected-check" src="/assets/icons/check-circle-fill.svg" alt="已选择">
+                        <img class="db-logo generic" src="/assets/icons/database-fill.svg" alt="">
+                        <span class="db-name">其他（JDBC）</span>
+                    </button>
+                </div>
+            </section>
+
+            <section id="driverSection" class="section" aria-labelledby="driverTitle">
+                <h2 id="driverTitle" class="section-title">JDBC 驱动</h2>
+                <div class="form-grid">
+                    <div class="field col-6">
+                        <label class="field-label" for="driverClass">驱动类（JDBC Driver）</label>
+                        <input class="input" id="driverClass" name="driverClass" value="com.kingbase8.Driver" autocomplete="off" required>
+                        <p class="field-help">请输入完整的 JDBC 驱动类名。</p>
+                    </div>
+                    <div class="field col-6">
+                        <span class="field-label">驱动 JAR 文件</span>
+                        <div class="file-control">
+                            <input class="visually-hidden" id="driverJar" name="driverJar" type="file" accept=".jar,application/java-archive" required>
+                            <label class="file-button" for="driverJar"><img src="/assets/icons/upload.svg" alt="">选择文件</label>
+                            <span id="driverFileName" class="file-name">未选择驱动文件</span>
+                            <img id="driverFileOk" class="file-ok" src="/assets/icons/check-circle-fill.svg" alt="已选择" hidden>
+                        </div>
+                        <p id="driverHint" class="field-help">请选择与数据库版本匹配的 KingbaseES JDBC 驱动。</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="connectionSection" class="section" aria-labelledby="connectionTitle">
+                <div id="connectionBanner" class="connection-banner" hidden>
+                    <div class="connection-banner-copy">
+                        <img id="bannerDbIcon" class="generic" src="/assets/icons/database-fill.svg" alt="">
+                        <div><strong id="bannerDbName">KingbaseES</strong><span id="bannerDriverName">com.kingbase8.Driver</span></div>
+                    </div>
+                    <button class="link-button" type="button" data-go-step="1">更换数据库</button>
+                </div>
+                <h2 id="connectionTitle" class="section-title">连接信息</h2>
+                <div id="structuredConnection" class="form-grid">
+                    <div class="field col-4">
+                        <label class="field-label" for="host">主机（Host）</label>
+                        <input class="input connection-input" id="host" name="host" value="127.0.0.1" autocomplete="off" required>
+                    </div>
+                    <div class="field col-3">
+                        <label class="field-label" for="port">端口（Port）</label>
+                        <input class="input connection-input" id="port" name="port" inputmode="numeric" value="54321" autocomplete="off" required>
+                    </div>
+                    <div class="field col-5">
+                        <label class="field-label" for="databaseName">数据库（Database）</label>
+                        <input class="input connection-input" id="databaseName" name="databaseName" placeholder="例如 sampledb" autocomplete="off" required>
+                    </div>
+                </div>
+                <div id="genericConnection" class="form-grid" hidden>
+                    <div class="field col-12">
+                        <label class="field-label" for="customJdbcUrl">JDBC URL</label>
+                        <input class="input connection-input" id="customJdbcUrl" placeholder="jdbc:vendor://host:port/database" autocomplete="off">
+                        <p class="field-help">通用 JDBC 模式不会改写连接地址，请填写驱动支持的完整 URL。</p>
+                    </div>
+                </div>
+                <div class="form-grid" style="margin-top:16px">
+                    <div class="field col-4">
+                        <label class="field-label" for="username">用户名（User）</label>
+                        <input class="input connection-input" id="username" name="username" autocomplete="off" required>
+                    </div>
+                    <div class="field col-4">
+                        <label class="field-label" for="password">密码（Password）<em>仅用于当前请求</em></label>
+                        <div class="password-wrap">
+                            <input class="input connection-input" id="password" name="password" type="password" autocomplete="off">
+                            <button id="passwordToggle" class="icon-button password-toggle" type="button" aria-label="显示密码">
+                                <img id="passwordIcon" src="/assets/icons/eye.svg" alt="">
+                            </button>
+                        </div>
+                    </div>
+                    <div class="field col-4">
+                        <label class="field-label" for="connectionParams">连接参数<em>可选</em></label>
+                        <input class="input connection-input" id="connectionParams" name="connectionParams" placeholder="例如 sslmode=require" autocomplete="off">
+                        <p class="field-help">多个参数使用 <b>&amp;</b> 分隔。</p>
+                    </div>
+                    <div class="field col-12">
+                        <label class="field-label" for="jdbcUrlPreview">JDBC URL 预览</label>
+                        <input class="input" id="jdbcUrlPreview" readonly aria-describedby="jdbcHelp">
+                        <p id="jdbcHelp" class="field-help">连接地址由上方字段自动生成；密码不会写入 URL。</p>
+                    </div>
+                </div>
+
+                <div class="connection-test">
+                    <div class="test-copy">
+                        <h3>连接测试</h3>
+                        <p>验证驱动与连接信息，只读取数据库产品信息。</p>
+                        <button id="testConnectionButton" class="button button-primary" type="button">
+                            <img src="/assets/icons/plug-fill.svg" alt="">测试连接
+                        </button>
+                    </div>
+                    <div id="testResult" class="test-result" role="status" aria-live="polite">
+                        完成驱动与连接配置后，可先测试连接再继续。
+                    </div>
+                </div>
+            </section>
+
+            <section id="scopeSection" class="section" aria-labelledby="scopeTitle" hidden>
+                <h2 id="scopeTitle" class="section-title">选择导出范围</h2>
+                <p class="section-intro">可按项目清单、整个模式或单个表/视图生成 DDL。</p>
+                <div class="mode-grid" role="group" aria-label="导出范围">
+                    <button class="mode-card" type="button" data-mode="csv" aria-pressed="true">
+                        <strong>项目 CSV 清单</strong><span>读取 schema 和 object 列，按所选模式批量导出。</span>
+                    </button>
+                    <button class="mode-card" type="button" data-mode="schema" aria-pressed="false">
+                        <strong>整个模式</strong><span>导出当前账号在该模式下可见的表和视图。</span>
+                    </button>
+                    <button class="mode-card" type="button" data-mode="single" aria-pressed="false">
+                        <strong>单个对象</strong><span>只导出指定模式中的一张表或一个视图。</span>
+                    </button>
+                </div>
+
+                <div class="scope-fields form-grid">
+                    <div id="csvFields" class="field col-12">
+                        <span class="field-label">项目对象清单 CSV</span>
+                        <div class="file-control">
+                            <input class="visually-hidden" id="usageCsv" name="usageCsv" type="file" accept=".csv,text/csv">
+                            <label class="file-button" for="usageCsv"><img src="/assets/icons/upload.svg" alt="">选择 CSV</label>
+                            <span id="csvFileName" class="file-name">未选择清单文件</span>
+                            <img id="csvFileOk" class="file-ok" src="/assets/icons/check-circle-fill.svg" alt="已选择" hidden>
+                        </div>
+                        <p class="field-help">文件须为 UTF-8 编码，并包含 schema 和 object 列。</p>
+                    </div>
+                    <div id="schemaField" class="field col-6">
+                        <label class="field-label" for="schemaName">模式名（Schema）</label>
+                        <input class="input" id="schemaName" name="schemaName" placeholder="例如 public" autocomplete="off">
+                    </div>
+                    <div id="csvSchemaField" class="field col-6">
+                        <label class="field-label" for="csvSchemaSelect">CSV 模式分类</label>
+                        <select class="select" id="csvSchemaSelect" disabled>
+                            <option value="">请先选择 CSV 文件</option>
+                        </select>
+                    </div>
+                    <div id="objectField" class="field col-6" hidden>
+                        <label class="field-label" for="tableName">对象名（表或视图）</label>
+                        <input class="input" id="tableName" name="tableName" placeholder="例如 orders" autocomplete="off">
+                    </div>
+                    <div class="field col-6">
+                        <label class="field-label" for="encoding">文件编码</label>
+                        <select class="select" id="encoding" disabled>
+                            <option>UTF-8</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="csv-summary-card"><p id="csvSummary">选择 CSV 后，工具会自动识别模式和去重对象；每次导出一个模式。</p></div>
+
+                <div id="progressPanel" class="progress-panel" hidden>
+                    <div class="progress-head"><span id="progressMessage" class="progress-message">准备开始……</span><span id="progressCount" class="progress-count">0%</span></div>
+                    <div id="progressTrack" class="progress-track indeterminate" role="progressbar" aria-label="DDL 导出进度"><div id="progressFill" class="progress-fill"></div></div>
+                </div>
+                <div id="exportStatus" class="export-status" role="status" aria-live="polite" hidden></div>
+            </section>
+        </div>
+    </form>
+
+    <aside class="panel summary" aria-labelledby="summaryTitle">
+        <div class="summary-body">
+            <h2 id="summaryTitle" class="summary-title">当前配置摘要</h2>
+            <section class="summary-group">
+                <h3 class="summary-label">数据库</h3>
+                <div class="summary-database">
+                    <img id="summaryDbIcon" class="generic" src="/assets/icons/database-fill.svg" alt="">
+                    <div><strong id="summaryDbName">KingbaseES</strong><span id="summarySupport">原生 DDL + JDBC 回退</span></div>
+                </div>
+            </section>
+            <section class="summary-group">
+                <h3 class="summary-label">连接</h3>
+                <dl class="summary-list">
+                    <dt>主机</dt><dd id="summaryHost">127.0.0.1</dd>
+                    <dt>端口</dt><dd id="summaryPort">54321</dd>
+                    <dt>数据库</dt><dd id="summaryDatabase">未填写</dd>
+                    <dt>用户名</dt><dd id="summaryUsername">未填写</dd>
+                    <dt>驱动类</dt><dd id="summaryDriver">com.kingbase8.Driver</dd>
+                    <dt>驱动 JAR</dt><dd id="summaryJar">未选择</dd>
+                </dl>
+            </section>
+            <section class="summary-group">
+                <h3 class="summary-label">导出范围</h3>
+                <dl class="summary-list">
+                    <dt>模式选择</dt><dd id="summaryMode">项目 CSV 清单</dd>
+                    <dt>模式</dt><dd id="summarySchema">未选择</dd>
+                    <dt>对象</dt><dd id="summaryObject">按清单筛选</dd>
+                    <dt>输出格式</dt><dd>SQL DDL</dd>
+                    <dt>编码</dt><dd>UTF-8</dd>
+                </dl>
+            </section>
+            <div id="security-note" class="security-note">
+                <div class="security-title"><img src="/assets/icons/lock-fill.svg" alt="">安全说明</div>
+                <p>所有连接与导出处理均在本机完成，不上传驱动、密码或数据库信息。请只使用可信来源的 JDBC 驱动。</p>
+            </div>
+        </div>
+        <div class="summary-actions">
+            <button id="primaryAction" class="button button-primary" type="button">继续：连接配置<img src="/assets/icons/arrow-right.svg" alt=""></button>
+            <button id="backAction" class="button button-secondary" type="button" disabled><img src="/assets/icons/arrow-left.svg" alt="">返回上一步</button>
+        </div>
+    </aside>
+</main>
+
+<script>
+    const presets = {
+        kingbase: {
+            name: 'KingbaseES', driverClass: 'com.kingbase8.Driver', port: '54321', icon: '/assets/icons/database-fill.svg', genericIcon: true,
+            support: '原生 DDL + JDBC 回退', jarHint: '请选择与数据库版本匹配的 KingbaseES JDBC 驱动。',
+            url(host, port, database, params) { return 'jdbc:kingbase8://' + host + ':' + port + '/' + database + query(params); }
+        },
+        postgresql: {
+            name: 'PostgreSQL', driverClass: 'org.postgresql.Driver', port: '5432', icon: '/assets/icons/postgresql.svg',
+            support: '标准 JDBC 元数据', jarHint: '请选择 PostgreSQL JDBC Driver（postgresql-*.jar）。',
+            url(host, port, database, params) { return 'jdbc:postgresql://' + host + ':' + port + '/' + database + query(params); }
+        },
+        mysql: {
+            name: 'MySQL / MariaDB', driverClass: 'com.mysql.cj.jdbc.Driver', port: '3306', icon: '/assets/icons/mysql.svg',
+            support: '标准 JDBC 元数据', jarHint: 'MySQL 请选择 Connector/J；MariaDB 可将驱动类改为 org.mariadb.jdbc.Driver。',
+            url(host, port, database, params) { return 'jdbc:mysql://' + host + ':' + port + '/' + database + query(params); }
+        },
+        oracle: {
+            name: 'Oracle', driverClass: 'oracle.jdbc.OracleDriver', port: '1521', icon: '/assets/icons/oracle.svg',
+            support: '实验性 JDBC 元数据', jarHint: '请选择与 Oracle/JDK 版本匹配的 ojdbc*.jar；视图定义支持可能受限。',
+            url(host, port, database, params) { return 'jdbc:oracle:thin:@//' + host + ':' + port + '/' + database + (params ? '?' + params : ''); }
+        },
+        sqlserver: {
+            name: 'SQL Server', driverClass: 'com.microsoft.sqlserver.jdbc.SQLServerDriver', port: '1433', icon: '/assets/icons/sqlserver.svg',
+            support: '标准 JDBC 元数据', jarHint: '请选择 Microsoft JDBC Driver for SQL Server（mssql-jdbc-*.jar）。',
+            url(host, port, database, params) { return 'jdbc:sqlserver://' + host + ':' + port + ';databaseName=' + database + (params ? ';' + params.replaceAll('&', ';') : ''); }
+        },
+        generic: {
+            name: '其他（JDBC）', driverClass: '', port: '', icon: '/assets/icons/database-fill.svg', genericIcon: true,
+            support: '通用 JDBC 元数据', jarHint: '请选择目标数据库的 JDBC 驱动，并填写驱动类与完整 JDBC URL。',
+            url() { return customJdbcUrl.value.trim(); }
+        }
+    };
+
+    const form = document.getElementById('exportForm');
+    const databaseType = document.getElementById('databaseType');
+    const exportMode = document.getElementById('exportMode');
+    const jdbcUrl = document.getElementById('jdbcUrl');
+    const driverClass = document.getElementById('driverClass');
+    const driverJar = document.getElementById('driverJar');
+    const driverFileName = document.getElementById('driverFileName');
+    const driverFileOk = document.getElementById('driverFileOk');
+    const driverHint = document.getElementById('driverHint');
+    const host = document.getElementById('host');
+    const port = document.getElementById('port');
+    const databaseName = document.getElementById('databaseName');
+    const customJdbcUrl = document.getElementById('customJdbcUrl');
+    const username = document.getElementById('username');
+    const password = document.getElementById('password');
+    const connectionParams = document.getElementById('connectionParams');
+    const jdbcUrlPreview = document.getElementById('jdbcUrlPreview');
+    const structuredConnection = document.getElementById('structuredConnection');
+    const genericConnection = document.getElementById('genericConnection');
+    const testConnectionButton = document.getElementById('testConnectionButton');
+    const testResult = document.getElementById('testResult');
+    const workspaceTitle = document.getElementById('workspaceTitle');
+    const workspaceSubtitle = document.getElementById('workspaceSubtitle');
+    const databaseSection = document.getElementById('databaseSection');
+    const driverSection = document.getElementById('driverSection');
+    const connectionSection = document.getElementById('connectionSection');
+    const connectionBanner = document.getElementById('connectionBanner');
+    const scopeSection = document.getElementById('scopeSection');
+    const primaryAction = document.getElementById('primaryAction');
+    const backAction = document.getElementById('backAction');
+    const usageCsv = document.getElementById('usageCsv');
+    const csvFileName = document.getElementById('csvFileName');
+    const csvFileOk = document.getElementById('csvFileOk');
+    const csvFields = document.getElementById('csvFields');
+    const csvSchemaField = document.getElementById('csvSchemaField');
+    const csvSchemaSelect = document.getElementById('csvSchemaSelect');
+    const csvSummary = document.getElementById('csvSummary');
+    const schemaName = document.getElementById('schemaName');
+    const objectField = document.getElementById('objectField');
+    const tableName = document.getElementById('tableName');
+    const progressPanel = document.getElementById('progressPanel');
+    const progressMessage = document.getElementById('progressMessage');
+    const progressCount = document.getElementById('progressCount');
+    const progressTrack = document.getElementById('progressTrack');
+    const progressFill = document.getElementById('progressFill');
+    const exportStatus = document.getElementById('exportStatus');
+
+    let currentStep = 1;
+    let furthestStep = 1;
+    let connectionVerified = false;
+    let exporting = false;
+
+    function query(params) { return params ? '?' + params : ''; }
+    function preset() { return presets[databaseType.value]; }
+    function valueOr(value, fallback = '未填写') { return value.trim() || fallback; }
+
+    function setIcon(element, selectedPreset) {
+        element.src = selectedPreset.icon;
+        element.classList.toggle('generic', Boolean(selectedPreset.genericIcon));
+    }
+
+    function buildJdbcUrl() {
+        const selected = preset();
+        const result = databaseType.value === 'generic'
+            ? customJdbcUrl.value.trim()
+            : selected.url(host.value.trim(), port.value.trim(), databaseName.value.trim(), connectionParams.value.trim());
+        jdbcUrl.value = result;
+        jdbcUrlPreview.value = result;
+        return result;
+    }
+
+    function updateSummary() {
+        const selected = preset();
+        document.getElementById('summaryDbName').textContent = selected.name;
+        document.getElementById('summarySupport').textContent = selected.support;
+        setIcon(document.getElementById('summaryDbIcon'), selected);
+        document.getElementById('summaryHost').textContent = databaseType.value === 'generic' ? '自定义 URL' : valueOr(host.value);
+        document.getElementById('summaryPort').textContent = databaseType.value === 'generic' ? '—' : valueOr(port.value);
+        document.getElementById('summaryDatabase').textContent = databaseType.value === 'generic' ? '由 URL 指定' : valueOr(databaseName.value);
+        document.getElementById('summaryUsername').textContent = valueOr(username.value);
+        document.getElementById('summaryDriver').textContent = valueOr(driverClass.value);
+        document.getElementById('summaryJar').textContent = driverJar.files[0] ? driverJar.files[0].name : '未选择';
+        document.getElementById('summarySchema').textContent = valueOr(schemaName.value, '未选择');
+        document.getElementById('summaryObject').textContent = exportMode.value === 'single' ? valueOr(tableName.value, '未填写')
+            : exportMode.value === 'schema' ? '全部表与视图' : '按清单筛选';
+        document.getElementById('summaryMode').textContent = exportMode.value === 'single' ? '单个对象'
+            : exportMode.value === 'schema' ? '整个模式' : '项目 CSV 清单';
+        document.getElementById('bannerDbName').textContent = selected.name;
+        document.getElementById('bannerDriverName').textContent = valueOr(driverClass.value);
+        setIcon(document.getElementById('bannerDbIcon'), selected);
+    }
+
+    function resetConnectionState() {
+        connectionVerified = false;
+        testResult.className = 'test-result';
+        testResult.textContent = '连接信息已更新，建议重新测试连接。';
+    }
+
+    function selectDatabase(type) {
+        const previousType = databaseType.value;
+        databaseType.value = type;
+        document.querySelectorAll('.db-card').forEach(card => card.setAttribute('aria-pressed', String(card.dataset.db === type)));
+        const selected = preset();
+        driverClass.value = selected.driverClass;
+        driverHint.textContent = selected.jarHint;
+        if (type !== 'generic' && (previousType !== type || !port.value)) port.value = selected.port;
+        structuredConnection.hidden = type === 'generic';
+        genericConnection.hidden = type !== 'generic';
+        host.required = type !== 'generic';
+        port.required = type !== 'generic';
+        databaseName.required = type !== 'generic';
+        customJdbcUrl.required = type === 'generic';
+        resetConnectionState();
+        buildJdbcUrl();
+        updateSummary();
+    }
+
+    function updateStepUi() {
+        document.querySelectorAll('[data-step-item]').forEach(item => {
+            const step = Number(item.dataset.stepItem);
+            item.classList.toggle('active', step === currentStep);
+            item.classList.toggle('complete', step < currentStep);
+            const button = item.querySelector('.step-button');
+            button.disabled = step > furthestStep;
+            if (step === currentStep) button.setAttribute('aria-current', 'step');
+            else button.removeAttribute('aria-current');
+        });
+
+        databaseSection.hidden = currentStep !== 1;
+        driverSection.hidden = currentStep !== 1;
+        connectionSection.hidden = currentStep === 3;
+        connectionBanner.hidden = currentStep !== 2;
+        scopeSection.hidden = currentStep !== 3;
+        backAction.disabled = currentStep === 1 || exporting;
+
+        if (currentStep === 1) {
+            workspaceTitle.textContent = '选择数据库与驱动';
+            workspaceSubtitle.textContent = '选择目标数据库类型，配置 JDBC 驱动与连接信息。';
+            primaryAction.innerHTML = '继续：连接配置<img src="/assets/icons/arrow-right.svg" alt="">';
+        } else if (currentStep === 2) {
+            workspaceTitle.textContent = '确认连接配置';
+            workspaceSubtitle.textContent = '核对连接地址并测试数据库连接，不会执行任何写操作。';
+            primaryAction.innerHTML = '继续：配置导出范围<img src="/assets/icons/arrow-right.svg" alt="">';
+        } else {
+            workspaceTitle.textContent = '配置导出范围';
+            workspaceSubtitle.textContent = '选择要导出的模式或对象，生成可审核的 SQL DDL 文件。';
+            primaryAction.innerHTML = '<img src="/assets/icons/upload.svg" alt="">开始导出 DDL';
+        }
+        updateSummary();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function showFieldError(element, message) {
+        element.setCustomValidity(message || '');
+        if (message) element.reportValidity();
+    }
+
+    function validateStep(step, report = true) {
+        if (step === 1) {
+            if (!driverClass.value.trim()) { if (report) showFieldError(driverClass, '请填写 JDBC 驱动类'); return false; }
+            showFieldError(driverClass, '');
+            if (!driverJar.files[0]) { if (report) driverJar.click(); return false; }
+            return true;
+        }
+        if (step === 2) {
+            buildJdbcUrl();
+            const fields = databaseType.value === 'generic' ? [customJdbcUrl, username] : [host, port, databaseName, username];
+            for (const field of fields) {
+                if (!field.value.trim()) { if (report) field.reportValidity(); return false; }
+            }
+            if (!jdbcUrl.value.startsWith('jdbc:')) { if (report) showFieldError(databaseType.value === 'generic' ? customJdbcUrl : host, 'JDBC URL 必须以 jdbc: 开头'); return false; }
+            showFieldError(databaseType.value === 'generic' ? customJdbcUrl : host, '');
+            return true;
+        }
+        if (step === 3) {
+            if (exportMode.value === 'csv') {
+                if (!usageCsv.files[0]) { if (report) usageCsv.click(); return false; }
+                schemaName.value = csvSchemaSelect.value;
+                if (!schemaName.value) { if (report) csvSchemaSelect.reportValidity(); return false; }
+            } else if (!schemaName.value.trim()) {
+                if (report) schemaName.reportValidity();
+                return false;
+            }
+            if (exportMode.value === 'single' && !tableName.value.trim()) {
+                if (report) tableName.reportValidity();
+                return false;
+            }
+            return true;
+        }
+        return true;
+    }
+
+    function goToStep(step) {
+        if (step > currentStep) {
+            for (let index = currentStep; index < step; index++) {
+                if (!validateStep(index)) return;
+            }
+        }
+        currentStep = step;
+        furthestStep = Math.max(furthestStep, step);
+        updateStepUi();
+    }
+
+    async function testConnection() {
+        if (!validateStep(1) || !validateStep(2)) return;
+        testConnectionButton.disabled = true;
+        testResult.className = 'test-result loading';
+        testResult.textContent = '正在加载驱动并连接数据库……';
+        const data = new FormData();
+        data.append('csrfToken', form.elements.csrfToken.value);
+        data.append('driverJar', driverJar.files[0]);
+        data.append('driverClass', driverClass.value.trim());
+        data.append('jdbcUrl', buildJdbcUrl());
+        data.append('username', username.value.trim());
+        data.append('password', password.value);
+        try {
+            const response = await fetch('/api/test-connection', { method: 'POST', body: data });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || '连接测试失败');
+            connectionVerified = true;
+            testResult.className = 'test-result success';
+            testResult.innerHTML = '<div><div class="result-line"><img src="/assets/icons/check-circle-fill.svg" alt="">连接成功</div>'
+                + '<div class="result-meta">' + escapeHtml(result.product + ' ' + result.version) + '<br>响应时间：' + result.elapsedMs + ' ms</div></div>';
+        } catch (error) {
+            connectionVerified = false;
+            testResult.className = 'test-result error';
+            testResult.textContent = error.message || String(error);
+        } finally {
+            testConnectionButton.disabled = false;
+        }
+    }
+
+    function escapeHtml(value) {
+        const div = document.createElement('div');
+        div.textContent = value;
+        return div.innerHTML;
+    }
+
+    function updateMode(mode) {
+        exportMode.value = mode;
+        document.querySelectorAll('.mode-card').forEach(card => card.setAttribute('aria-pressed', String(card.dataset.mode === mode)));
+        csvFields.hidden = mode !== 'csv';
+        csvSchemaField.hidden = mode !== 'csv';
+        objectField.hidden = mode !== 'single';
+        usageCsv.required = mode === 'csv';
+        csvSchemaSelect.required = mode === 'csv';
+        schemaName.required = mode !== 'csv';
+        tableName.required = mode === 'single';
+        csvSummary.parentElement.hidden = mode !== 'csv';
+        updateSummary();
+    }
+
+    async function analyzeCsv() {
+        const file = usageCsv.files[0];
+        csvFileName.textContent = file ? file.name : '未选择清单文件';
+        csvFileOk.hidden = !file;
+        csvSchemaSelect.innerHTML = '<option value="">正在分析 CSV……</option>';
+        csvSchemaSelect.disabled = true;
+        schemaName.value = '';
+        updateSummary();
+        if (!file) {
+            csvSchemaSelect.innerHTML = '<option value="">请先选择 CSV 文件</option>';
+            csvSummary.textContent = '选择 CSV 后，工具会自动识别模式和去重对象；每次导出一个模式。';
+            return;
+        }
+        csvSummary.textContent = '正在读取 CSV 并按模式分类……';
+        try {
+            const data = new FormData();
+            data.append('csrfToken', form.elements.csrfToken.value);
+            data.append('usageCsv', file);
+            const response = await fetch('/api/csv-summary', { method: 'POST', body: data });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'CSV 分析失败');
+            result.schemas.sort((left, right) => right.count - left.count || left.name.localeCompare(right.name));
+            csvSchemaSelect.innerHTML = '';
+            let total = 0;
+            result.schemas.forEach(item => {
+                total += item.count;
+                const option = document.createElement('option');
+                option.value = item.name;
+                option.textContent = item.name + '（' + item.count + ' 个对象）';
+                csvSchemaSelect.appendChild(option);
+            });
+            csvSchemaSelect.disabled = false;
+            const preferred = result.schemas.find(item => item.name.toLowerCase() === 'public') || result.schemas[0];
+            csvSchemaSelect.value = preferred.name;
+            schemaName.value = preferred.name;
+            csvSummary.textContent = '已识别 ' + result.schemas.length + ' 个模式、' + total + ' 个去重对象。当前将导出所选模式。';
+            updateSummary();
+        } catch (error) {
+            csvSchemaSelect.innerHTML = '<option value="">CSV 分析失败</option>';
+            csvSummary.textContent = error.message || String(error);
+        }
+    }
+
+    function filenameFrom(response) {
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename="?([^";]+)"?/i);
+        return match ? match[1] : 'database_ddl.sql';
+    }
+
+    function newJobId() {
+        if (crypto.randomUUID) return crypto.randomUUID();
+        const bytes = new Uint8Array(20);
+        crypto.getRandomValues(bytes);
+        return Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
+    }
+
+    function updateProgress(data) {
+        progressPanel.hidden = false;
+        progressMessage.textContent = data.message || '正在处理……';
+        if (data.total > 0) {
+            const percent = Math.max(0, Math.min(100, Math.round(data.current * 100 / data.total)));
+            progressTrack.classList.remove('indeterminate');
+            progressFill.style.width = percent + '%';
+            progressCount.textContent = data.current + ' / ' + data.total + '（' + percent + '%）';
+            progressTrack.setAttribute('aria-valuemin', '0');
+            progressTrack.setAttribute('aria-valuemax', String(data.total));
+            progressTrack.setAttribute('aria-valuenow', String(data.current));
+        } else {
+            progressTrack.classList.add('indeterminate');
+            progressFill.style.width = '';
+            progressCount.textContent = '连接中';
+            progressTrack.removeAttribute('aria-valuenow');
+        }
+    }
+
+    function showExportStatus(type, text) {
+        exportStatus.hidden = false;
+        exportStatus.className = 'export-status ' + type;
+        exportStatus.textContent = text;
+    }
+
+    async function exportDdl() {
+        if (!validateStep(1) || !validateStep(2) || !validateStep(3)) return;
+        exporting = true;
+        primaryAction.disabled = true;
+        backAction.disabled = true;
+        progressPanel.hidden = false;
+        progressTrack.classList.add('indeterminate');
+        progressFill.style.width = '';
+        progressMessage.textContent = '正在启动导出任务……';
+        progressCount.textContent = '连接中';
+        showExportStatus('info', '正在读取对象并生成 DDL；对象较多时需要几分钟，请保持页面打开。');
+        const jobId = newJobId();
+        const progressUrl = '/api/progress?jobId=' + encodeURIComponent(jobId) + '&csrfToken=' + encodeURIComponent(form.elements.csrfToken.value);
+        const progressEvents = new EventSource(progressUrl);
+        progressEvents.addEventListener('progress', event => {
+            try { const data = JSON.parse(event.data); updateProgress(data); if (data.done) progressEvents.close(); } catch (_) {}
+        });
+        try {
+            buildJdbcUrl();
+            if (exportMode.value === 'csv') schemaName.value = csvSchemaSelect.value;
+            const requestData = new FormData(form);
+            requestData.append('jobId', jobId);
+            const response = await fetch('/api/export', { method: 'POST', body: requestData });
+            if (!response.ok) {
+                let message = '导出失败（HTTP ' + response.status + '）';
+                try { const data = await response.json(); if (data.error) message = data.error; } catch (_) {}
+                throw new Error(message);
+            }
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = filenameFrom(response);
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            URL.revokeObjectURL(url);
+            progressTrack.classList.remove('indeterminate');
+            progressFill.style.width = '100%';
+            progressMessage.textContent = 'DDL 文件生成完成';
+            progressCount.textContent = '100%';
+            showExportStatus('success', '导出成功，SQL 文件已开始下载。请先在隔离的测试库审核后再执行。');
+        } catch (error) {
+            showExportStatus('error', error.message || String(error));
+        } finally {
+            progressEvents.close();
+            exporting = false;
+            primaryAction.disabled = false;
+            backAction.disabled = currentStep === 1;
+        }
+    }
+
+    document.querySelectorAll('.db-card').forEach(card => card.addEventListener('click', () => selectDatabase(card.dataset.db)));
+    document.querySelectorAll('.mode-card').forEach(card => card.addEventListener('click', () => updateMode(card.dataset.mode)));
+    document.querySelectorAll('[data-go-step]').forEach(button => button.addEventListener('click', () => goToStep(Number(button.dataset.goStep))));
+    document.querySelectorAll('.connection-input').forEach(input => input.addEventListener('input', () => { resetConnectionState(); buildJdbcUrl(); updateSummary(); }));
+    driverClass.addEventListener('input', () => { resetConnectionState(); updateSummary(); });
+    driverJar.addEventListener('change', () => {
+        const file = driverJar.files[0];
+        driverFileName.textContent = file ? file.name : '未选择驱动文件';
+        driverFileOk.hidden = !file;
+        resetConnectionState();
+        updateSummary();
+    });
+    usageCsv.addEventListener('change', analyzeCsv);
+    csvSchemaSelect.addEventListener('change', () => { schemaName.value = csvSchemaSelect.value; updateSummary(); });
+    schemaName.addEventListener('input', updateSummary);
+    tableName.addEventListener('input', updateSummary);
+    testConnectionButton.addEventListener('click', testConnection);
+    primaryAction.addEventListener('click', () => currentStep < 3 ? goToStep(currentStep + 1) : exportDdl());
+    backAction.addEventListener('click', () => goToStep(Math.max(1, currentStep - 1)));
+    form.addEventListener('submit', event => event.preventDefault());
+    document.getElementById('passwordToggle').addEventListener('click', () => {
+        const showing = password.type === 'text';
+        password.type = showing ? 'password' : 'text';
+        document.getElementById('passwordIcon').src = showing ? '/assets/icons/eye.svg' : '/assets/icons/eye-slash.svg';
+        document.getElementById('passwordToggle').setAttribute('aria-label', showing ? '显示密码' : '隐藏密码');
+    });
+
+    selectDatabase('kingbase');
+    updateMode('csv');
+    updateStepUi();
+</script>
+</body>
+</html>

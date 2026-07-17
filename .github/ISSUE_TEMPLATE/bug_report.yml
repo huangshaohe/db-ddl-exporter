@@ -1,0 +1,49 @@
+name: Bug report
+description: Report a reproducible defect without including credentials or internal database details.
+title: '[Bug] '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: Do not include passwords, private JDBC URLs, internal IPs, or proprietary driver files.
+  - type: input
+    id: version
+    attributes:
+      label: Exporter version
+      placeholder: v1.1.0
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: Windows 11, Java 17, KingbaseES version, JDBC driver version
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - Browser UI
+        - CLI
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
